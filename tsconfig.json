@@ -38,15 +38,7 @@
     "dist",
     "release",
     "**/*.test.ts",
-    "**/*.test.tsx",
-    
-    // 一時的に除外（段階的に修正していく）
-    "src/renderer/components/features/staff/StaffForm/**/*",
-    "src/renderer/components/features/staff/StaffList/**/*", 
-    "src/renderer/services/api/base-api.ts",
-    "src/renderer/services/api/staff-api.ts",
-    "src/renderer/hooks/useStaff.ts",
-    "src/renderer/hooks/useApi.ts",
-    "src/renderer/pages/StaffPage/**/*"
+    "**/*.test.tsx"
+    // 💡 一時的に除外していたファイルを削除して、すべて含めるように変更
   ]
 }

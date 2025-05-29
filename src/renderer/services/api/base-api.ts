@@ -12,26 +12,29 @@ export abstract class BaseApi<T extends { id?: number }> {
         if (!window.electronAPI) {
             throw new Error('Electron API not available');
         }
-        return window.electronAPI.invoke(channel, ...args);
+
+        // 型安全性を確保するため、anyとして扱ってから適切な型にキャスト
+        const result = await window.electronAPI.invoke(channel, ...args);
+        return result as R;
     }
 
     async getAll(): Promise<ApiResponse<T[]>> {
-        return this.invoke(`${this.channelPrefix}:getAll`);
+        return this.invoke<ApiResponse<T[]>>(`${this.channelPrefix}:getAll`);
     }
 
     async getById(id: number): Promise<ApiResponse<T>> {
-        return this.invoke(`${this.channelPrefix}:getById`, id);
+        return this.invoke<ApiResponse<T>>(`${this.channelPrefix}:getById`, id);
     }
 
     async create(data: Omit<T, 'id'>): Promise<ApiResponse<T>> {
-        return this.invoke(`${this.channelPrefix}:create`, data);
+        return this.invoke<ApiResponse<T>>(`${this.channelPrefix}:create`, data);
     }
 
     async update(id: number, data: Partial<Omit<T, 'id'>>): Promise<ApiResponse<T>> {
-        return this.invoke(`${this.channelPrefix}:update`, id, data);
+        return this.invoke<ApiResponse<T>>(`${this.channelPrefix}:update`, id, data);
     }
 
     async delete(id: number): Promise<ApiResponse<void>> {
-        return this.invoke(`${this.channelPrefix}:delete`, id);
+        return this.invoke<ApiResponse<void>>(`${this.channelPrefix}:delete`, id);
     }
 }
