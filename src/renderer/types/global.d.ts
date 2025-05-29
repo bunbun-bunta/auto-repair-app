@@ -76,3 +76,11 @@ export interface IpcChannels {
     // 'schedule:getAll': (params: ScheduleSearchParams) => Promise<PaginatedResponse<Schedule>>;
     // など...
 }
+
+declare global {
+  interface Window {
+    electronAPI: {
+      invoke: (channel: string, ...args: any[]) => Promise<any>;
+    };
+  }
+}

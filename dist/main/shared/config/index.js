@@ -13,9 +13,25 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DatabaseConfig = void 0;
 // src/shared/config/index.ts
-__exportStar(require("./app"), exports);
 __exportStar(require("./database"), exports);
-__exportStar(require("./google"), exports);
+// src/shared/config/database.ts
+const path_1 = __importDefault(require("path"));
+exports.DatabaseConfig = {
+    // データベースファイルのパス（仮の設定）
+    DATABASE_PATH: process.env.DATABASE_PATH || path_1.default.join(process.cwd(), 'data', 'database.sqlite'),
+    // 接続設定
+    CONNECTION: {
+        TIMEOUT: 30000,
+        BUSY_TIMEOUT: 30000,
+        JOURNAL_MODE: 'WAL',
+        SYNCHRONOUS: 'NORMAL',
+        CACHE_SIZE: -64000, // 64MB
+    },
+};
 //# sourceMappingURL=index.js.map
