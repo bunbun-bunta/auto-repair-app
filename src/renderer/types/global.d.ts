@@ -48,6 +48,25 @@ interface ElectronAPI {
         checkDependencies: (id: number) => Promise<ApiResponse<{ hasSchedules: boolean; scheduleCount: number }>>;
     };
 
+
+    // 予定管理API
+    schedule: {
+        getAll: () => Promise<ApiResponse<any[]>>;
+        getById: (id: number) => Promise<ApiResponse<any>>;
+        create: (data: any) => Promise<ApiResponse<any>>;
+        update: (id: number, data: any) => Promise<ApiResponse<any>>;
+        delete: (id: number) => Promise<ApiResponse<void>>;
+        search: (params: any) => Promise<ApiResponse<any[]>>;
+        getByDateRange: (startDate: string, endDate: string) => Promise<ApiResponse<any[]>>;
+        getToday: () => Promise<ApiResponse<any[]>>;
+        getMonthlyStatistics: (year: number, month: number) => Promise<ApiResponse<any>>;
+        complete: (id: number, actualEndDatetime?: string) => Promise<ApiResponse<any>>;
+        updateBillingStatus: (id: number, status: string) => Promise<ApiResponse<any>>;
+        checkTimeConflict: (staffId: number, startDatetime: string, endDatetime: string, excludeScheduleId?: number) => Promise<ApiResponse<{ hasConflict: boolean; conflictingSchedules: any[] }>>;
+        getUnsynced: () => Promise<ApiResponse<any[]>>;
+        updateGoogleEventId: (scheduleId: number, googleEventId: string) => Promise<ApiResponse<void>>;
+    };
+
     // デバッグ機能
     _debug: {
         listChannels: () => string[];
@@ -80,3 +99,4 @@ declare module '*.ts' {
     const content: any;
     export default content;
 }
+
