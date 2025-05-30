@@ -29,8 +29,14 @@ import {
     Person,
     Refresh,
 } from '@mui/icons-material';
-import { Staff } from '../../../../shared/types';
-import { useStaff } from '../../../hooks/useStaff';
+
+// ❌ 修正前: 相対パスで複雑
+// import { Staff } from '../../../../shared/types';
+// import { useStaff } from '../../../hooks/useStaff';
+
+// ✅ 修正後: パスエイリアスを使用（シンプル）
+import { Staff } from '@shared/types';
+import { useStaff } from '@renderer/hooks/useStaff';
 import { StaffForm } from '../StaffForm';
 
 interface StaffCardProps {

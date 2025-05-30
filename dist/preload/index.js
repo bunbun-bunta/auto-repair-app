@@ -1,23 +1,23 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 // src/preload/index.ts (修正版 - より堅牢なIPC通信)
-import { contextBridge, ipcRenderer } from 'electron';
-
+const electron_1 = require("electron");
 console.log('[PRELOAD] プリロードスクリプト開始');
-
 // プリロードスクリプトが正しく実行されているかの確認
 console.log('[PRELOAD] Electron version:', process.versions.electron);
 console.log('[PRELOAD] Node version:', process.versions.node);
 console.log('[PRELOAD] Chrome version:', process.versions.chrome);
-
 // 型安全なIPC通信のためのAPI定義
 const electronAPI = {
     // 基本的なIPC通信メソッド（エラーハンドリング強化）
-    invoke: async (channel: string, ...args: any[]): Promise<any> => {
+    invoke: async (channel, ...args) => {
         console.log(`[PRELOAD] IPC呼び出し: ${channel}`, args);
         try {
-            const result = await ipcRenderer.invoke(channel, ...args);
+            const result = await electron_1.ipcRenderer.invoke(channel, ...args);
             console.log(`[PRELOAD] IPC応答: ${channel}`, result);
             return result;
-        } catch (error) {
+        }
+        catch (error) {
             console.error(`[PRELOAD] IPCエラー: ${channel}`, error);
             // エラーを再スローせず、エラー情報を含むレスポンスを返す
             return {
@@ -27,100 +27,83 @@ const electronAPI = {
             };
         }
     },
-
     // イベントリスナー登録（改善版）
-    on: (channel: string, callback: (...args: any[]) => void) => {
+    on: (channel, callback) => {
         console.log(`[PRELOAD] イベントリスナー登録: ${channel}`);
-        const subscription = (event: any, ...args: any[]) => {
+        const subscription = (event, ...args) => {
             console.log(`[PRELOAD] イベント受信: ${channel}`, args);
             callback(...args);
         };
-        ipcRenderer.on(channel, subscription);
-
+        electron_1.ipcRenderer.on(channel, subscription);
         // クリーンアップ用の関数を返す
         return () => {
             console.log(`[PRELOAD] イベントリスナー削除: ${channel}`);
-            ipcRenderer.removeListener(channel, subscription);
+            electron_1.ipcRenderer.removeListener(channel, subscription);
         };
     },
-
     // イベントリスナー削除
-    removeListener: (channel: string, callback: (...args: any[]) => void) => {
+    removeListener: (channel, callback) => {
         console.log(`[PRELOAD] イベントリスナー削除: ${channel}`);
-        ipcRenderer.removeListener(channel, callback);
+        electron_1.ipcRenderer.removeListener(channel, callback);
     },
-
     // === システム情報 ===
     getAppVersion: async () => {
         console.log('[PRELOAD] アプリバージョン要求');
-        return await ipcRenderer.invoke('app:getVersion');
+        return await electron_1.ipcRenderer.invoke('app:getVersion');
     },
-
     getAppPath: async () => {
         console.log('[PRELOAD] アプリパス要求');
-        return await ipcRenderer.invoke('app:getPath');
+        return await electron_1.ipcRenderer.invoke('app:getPath');
     },
-
     // === 接続テスト ===
     testConnection: async () => {
         console.log('[PRELOAD] 接続テスト実行');
-        return await ipcRenderer.invoke('system:test:connection');
+        return await electron_1.ipcRenderer.invoke('system:test:connection');
     },
-
     // === 通知機能 ===
-    showNotification: async (title: string, body: string) => {
+    showNotification: async (title, body) => {
         console.log('[PRELOAD] 通知表示要求:', { title, body });
-        return await ipcRenderer.invoke('notification:show', title, body);
+        return await electron_1.ipcRenderer.invoke('notification:show', title, body);
     },
-
     // === スタッフ管理（新規追加） ===
     staff: {
         getAll: async () => {
             console.log('[PRELOAD] スタッフ一覧取得');
-            return await ipcRenderer.invoke('staff:getAll');
+            return await electron_1.ipcRenderer.invoke('staff:getAll');
         },
-
-        getById: async (id: number) => {
+        getById: async (id) => {
             console.log('[PRELOAD] スタッフ取得:', id);
-            return await ipcRenderer.invoke('staff:getById', id);
+            return await electron_1.ipcRenderer.invoke('staff:getById', id);
         },
-
-        create: async (data: any) => {
+        create: async (data) => {
             console.log('[PRELOAD] スタッフ作成:', data);
-            return await ipcRenderer.invoke('staff:create', data);
+            return await electron_1.ipcRenderer.invoke('staff:create', data);
         },
-
-        update: async (id: number, data: any) => {
+        update: async (id, data) => {
             console.log('[PRELOAD] スタッフ更新:', id, data);
-            return await ipcRenderer.invoke('staff:update', id, data);
+            return await electron_1.ipcRenderer.invoke('staff:update', id, data);
         },
-
-        delete: async (id: number) => {
+        delete: async (id) => {
             console.log('[PRELOAD] スタッフ削除:', id);
-            return await ipcRenderer.invoke('staff:delete', id);
+            return await electron_1.ipcRenderer.invoke('staff:delete', id);
         },
-
-        updateOAuthStatus: async (id: number, status: string) => {
+        updateOAuthStatus: async (id, status) => {
             console.log('[PRELOAD] OAuth状態更新:', id, status);
-            return await ipcRenderer.invoke('staff:updateOAuthStatus', id, status);
+            return await electron_1.ipcRenderer.invoke('staff:updateOAuthStatus', id, status);
         },
-
         getStatistics: async () => {
             console.log('[PRELOAD] スタッフ統計取得');
-            return await ipcRenderer.invoke('staff:getStatistics');
+            return await electron_1.ipcRenderer.invoke('staff:getStatistics');
         },
-
-        checkColorUsage: async (color: string, excludeId?: number) => {
+        checkColorUsage: async (color, excludeId) => {
             console.log('[PRELOAD] 色使用チェック:', color, excludeId);
-            return await ipcRenderer.invoke('staff:checkColorUsage', color, excludeId);
+            return await electron_1.ipcRenderer.invoke('staff:checkColorUsage', color, excludeId);
         },
-
-        checkDependencies: async (id: number) => {
+        checkDependencies: async (id) => {
             console.log('[PRELOAD] 依存関係チェック:', id);
-            return await ipcRenderer.invoke('staff:checkDependencies', id);
+            return await electron_1.ipcRenderer.invoke('staff:checkDependencies', id);
         }
     },
-
     // === デバッグ機能 ===
     _debug: {
         listChannels: () => {
@@ -142,7 +125,6 @@ const electronAPI = {
             console.log('[PRELOAD] 利用可能なチャンネル:', channels);
             return channels;
         },
-
         // プリロードの状態確認
         getStatus: () => {
             return {
@@ -153,55 +135,49 @@ const electronAPI = {
         }
     }
 };
-
 // コンテキストブリッジでAPI公開（エラーハンドリング追加）
 try {
     console.log('[PRELOAD] contextBridge.exposeInMainWorld 実行中...');
-    
-    contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-    
+    electron_1.contextBridge.exposeInMainWorld('electronAPI', electronAPI);
     console.log('[PRELOAD] ✅ electronAPIを正常に公開しました');
     console.log('[PRELOAD] 公開されたメソッド:', Object.keys(electronAPI));
-} catch (error) {
+}
+catch (error) {
     console.error('[PRELOAD] ❌ contextBridge.exposeInMainWorldでエラー:', error);
-    
     // フォールバック: 直接windowオブジェクトに追加（セキュリティ上推奨されないが、デバッグ用）
     try {
-        (window as any).electronAPI = electronAPI;
+        window.electronAPI = electronAPI;
         console.log('[PRELOAD] ⚠️ フォールバック: windowオブジェクトに直接追加しました');
-    } catch (fallbackError) {
+    }
+    catch (fallbackError) {
         console.error('[PRELOAD] ❌ フォールバックも失敗:', fallbackError);
     }
 }
-
 // DOM読み込み完了時のイベント
 window.addEventListener('DOMContentLoaded', () => {
     console.log('[PRELOAD] ✅ DOM読み込み完了');
-    
     // 最終確認：APIが利用可能かテスト
-    if ((window as any).electronAPI) {
+    if (window.electronAPI) {
         console.log('[PRELOAD] ✅ electronAPIは利用可能です');
-    } else {
+    }
+    else {
         console.error('[PRELOAD] ❌ electronAPIが利用できません');
     }
 });
-
 // エラーハンドリング
 window.addEventListener('error', (event) => {
     console.error('[PRELOAD] グローバルエラー:', event.error);
 });
-
 window.addEventListener('unhandledrejection', (event) => {
     console.error('[PRELOAD] 未処理のPromise拒否:', event.reason);
 });
-
 // プリロードスクリプトが完了したことを通知
 console.log('[PRELOAD] ✅ プリロードスクリプトの設定完了');
-
 // デバッグ用：5秒後に状態確認
 setTimeout(() => {
     console.log('[PRELOAD] 5秒後状態確認:');
-    console.log('- window.electronAPI:', (window as any).electronAPI ? '✅ 利用可能' : '❌ 利用不可');
+    console.log('- window.electronAPI:', window.electronAPI ? '✅ 利用可能' : '❌ 利用不可');
     console.log('- contextIsolation:', process.contextIsolated ? '有効' : '無効');
     console.log('- nodeIntegration:', process.versions.node ? '有効' : '無効');
 }, 5000);
+//# sourceMappingURL=index.js.map

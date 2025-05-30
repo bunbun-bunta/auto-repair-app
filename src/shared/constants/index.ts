@@ -1,10 +1,10 @@
-// src/shared/constants/index.ts
+// src/shared/constants/index.ts (修正版)
 export * from './database';
 export * from './business';
 export * from './calendar';
 export * from './validation';
 
-// カレンダーイベントの色一覧
+// カレンダーイベントの色一覧（ここで直接定義）
 export const EVENT_COLORS = [
     '#FF6B6B',  // 赤系
     '#4ECDC4',  // 青緑系

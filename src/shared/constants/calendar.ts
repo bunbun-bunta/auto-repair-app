@@ -1,3 +1,4 @@
+// src/shared/constants/calendar.ts (修正版)
 // カレンダー関連の定数
 export const CALENDAR_CONFIG = {
     DEFAULT_VIEW: 'month',                    // デフォルト表示モード

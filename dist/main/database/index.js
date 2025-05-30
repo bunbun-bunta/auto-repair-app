@@ -1,85 +1,76 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DatabaseManager = void 0;
 // src/main/database/index.ts (修正版 - パス問題解決)
-import { Database } from 'sqlite3';
-import { app } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import { StaffRepository } from './repositories/staff-repository';
-
-export class DatabaseManager {
-    private db: Database | null = null;
-    private staffRepository: StaffRepository | null = null;
-    private dbPath: string;
-
+const sqlite3_1 = require("sqlite3");
+const electron_1 = require("electron");
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
+const staff_repository_1 = require("./repositories/staff-repository");
+class DatabaseManager {
     constructor() {
+        this.db = null;
+        this.staffRepository = null;
         // データベースファイルのパスを動的に決定
         try {
             // Electronアプリの場合
-            const userDataPath = app.getPath('userData');
-            this.dbPath = path.join(userDataPath, 'auto_repair.sqlite');
-            
+            const userDataPath = electron_1.app.getPath('userData');
+            this.dbPath = path_1.default.join(userDataPath, 'auto_repair.sqlite');
             // データフォルダが存在しない場合は作成
-            if (!fs.existsSync(userDataPath)) {
-                fs.mkdirSync(userDataPath, { recursive: true });
-            }
-        } catch (error) {
-            // Electronが利用できない場合（テスト環境など）
-            this.dbPath = path.join(process.cwd(), 'data', 'auto_repair.sqlite');
-            
-            // dataフォルダを作成
-            const dataDir = path.dirname(this.dbPath);
-            if (!fs.existsSync(dataDir)) {
-                fs.mkdirSync(dataDir, { recursive: true });
+            if (!fs_1.default.existsSync(userDataPath)) {
+                fs_1.default.mkdirSync(userDataPath, { recursive: true });
             }
         }
-
+        catch (error) {
+            // Electronが利用できない場合（テスト環境など）
+            this.dbPath = path_1.default.join(process.cwd(), 'data', 'auto_repair.sqlite');
+            // dataフォルダを作成
+            const dataDir = path_1.default.dirname(this.dbPath);
+            if (!fs_1.default.existsSync(dataDir)) {
+                fs_1.default.mkdirSync(dataDir, { recursive: true });
+            }
+        }
         console.log('[DB] データベースパス:', this.dbPath);
     }
-
-    async initialize(): Promise<void> {
+    async initialize() {
         try {
             console.log('[DB] データベース初期化開始...');
-
             // データベース接続
             await this.connect();
-
             // テーブル作成
             await this.createTables();
-
             // リポジトリ初期化
-            this.staffRepository = new StaffRepository(this.db!);
-
+            this.staffRepository = new staff_repository_1.StaffRepository(this.db);
             console.log('[DB] データベース初期化完了');
-        } catch (error) {
+        }
+        catch (error) {
             console.error('[DB] データベース初期化失敗:', error);
             throw error;
         }
     }
-
-    private async connect(): Promise<void> {
+    async connect() {
         return new Promise((resolve, reject) => {
             console.log('[DB] データベースに接続中:', this.dbPath);
-
-            this.db = new Database(this.dbPath, (err) => {
+            this.db = new sqlite3_1.Database(this.dbPath, (err) => {
                 if (err) {
                     console.error('[DB] データベース接続失敗:', err);
                     reject(err);
                     return;
                 }
-
                 console.log('[DB] SQLiteデータベースに接続しました');
-                
                 // SQLite設定の最適化
                 this.configurePragmas();
                 resolve();
             });
         });
     }
-
-    private configurePragmas(): void {
-        if (!this.db) return;
-
+    configurePragmas() {
+        if (!this.db)
+            return;
         console.log('[DB] SQLite設定を最適化中...');
-
         // WALモード（パフォーマンス向上）
         this.db.exec('PRAGMA journal_mode = WAL;');
         // 外部キー制約を有効化
@@ -88,19 +79,15 @@ export class DatabaseManager {
         this.db.exec('PRAGMA synchronous = NORMAL;');
         // キャッシュサイズ設定（64MB）
         this.db.exec('PRAGMA cache_size = -64000;');
-
         console.log('[DB] SQLite設定完了');
     }
-
-    private async createTables(): Promise<void> {
+    async createTables() {
         return new Promise((resolve, reject) => {
             if (!this.db) {
                 reject(new Error('データベース接続がありません'));
                 return;
             }
-
             console.log('[DB] テーブル作成中...');
-
             const queries = [
                 // スタッフテーブル
                 `CREATE TABLE IF NOT EXISTS staff (
@@ -113,7 +100,6 @@ export class DatabaseManager {
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )`,
-
                 // 車種マスタテーブル
                 `CREATE TABLE IF NOT EXISTS vehicle_types (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,7 +111,6 @@ export class DatabaseManager {
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )`,
-
                 // 顧客マスタテーブル
                 `CREATE TABLE IF NOT EXISTS customers (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,7 +124,6 @@ export class DatabaseManager {
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )`,
-
                 // 業務カテゴリマスタテーブル
                 `CREATE TABLE IF NOT EXISTS business_categories (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,7 +137,6 @@ export class DatabaseManager {
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )`,
-
                 // 予定テーブル
                 `CREATE TABLE IF NOT EXISTS schedules (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,25 +158,21 @@ export class DatabaseManager {
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (staff_id) REFERENCES staff (id)
                 )`,
-
                 // インデックス作成
                 `CREATE INDEX IF NOT EXISTS idx_staff_email ON staff(email)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_staff_id ON schedules(staff_id)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_start_datetime ON schedules(start_datetime)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_billing_status ON schedules(billing_status)`,
             ];
-
             let completed = 0;
             const total = queries.length;
-
             queries.forEach((query, index) => {
-                this.db!.exec(query, (err) => {
+                this.db.exec(query, (err) => {
                     if (err) {
                         console.error(`[DB] テーブル作成エラー (${index}):`, err);
                         reject(err);
                         return;
                     }
-
                     completed++;
                     if (completed === total) {
                         console.log('[DB] 全テーブル作成完了');
@@ -205,36 +184,30 @@ export class DatabaseManager {
             });
         });
     }
-
-    private async insertInitialData(): Promise<void> {
+    async insertInitialData() {
         return new Promise((resolve, reject) => {
             if (!this.db) {
                 reject(new Error('データベース接続がありません'));
                 return;
             }
-
             console.log('[DB] 初期データ投入中...');
-
             // 既存データをチェック
-            this.db.get('SELECT COUNT(*) as count FROM staff', (err, row: any) => {
+            this.db.get('SELECT COUNT(*) as count FROM staff', (err, row) => {
                 if (err) {
                     reject(err);
                     return;
                 }
-
                 // 既にデータがある場合はスキップ
                 if (row.count > 0) {
                     console.log('[DB] 初期データは既に存在します');
                     resolve();
                     return;
                 }
-
                 // 初期データ投入
                 const initialData = [
                     // デフォルトスタッフ
                     `INSERT INTO staff (name, display_color, permission_level) 
                      VALUES ('管理者', '#1976d2', '管理者')`,
-
                     // デフォルト業務カテゴリ
                     `INSERT INTO business_categories (name, icon, estimated_duration, display_order) VALUES
                      ('修理', '🔧', 120, 1),
@@ -244,7 +217,6 @@ export class DatabaseManager {
                      ('引取り', '📦', 30, 5),
                      ('相談', '💬', 45, 6),
                      ('その他', '📝', 60, 7)`,
-
                     // サンプル車種データ
                     `INSERT INTO vehicle_types (name, display_order) VALUES
                      ('トヨタプリウス', 1),
@@ -254,18 +226,15 @@ export class DatabaseManager {
                      ('ダイハツタント', 5),
                      ('マツダデミオ', 6)`,
                 ];
-
                 let insertCompleted = 0;
                 const insertTotal = initialData.length;
-
                 initialData.forEach((query, index) => {
-                    this.db!.exec(query, (err) => {
+                    this.db.exec(query, (err) => {
                         if (err) {
                             console.error(`[DB] 初期データ投入エラー (${index}):`, err);
                             reject(err);
                             return;
                         }
-
                         insertCompleted++;
                         if (insertCompleted === insertTotal) {
                             console.log('[DB] 初期データ投入完了');
@@ -276,28 +245,25 @@ export class DatabaseManager {
             });
         });
     }
-
-    getStaffRepository(): StaffRepository {
+    getStaffRepository() {
         if (!this.staffRepository) {
             throw new Error('StaffRepository が初期化されていません');
         }
         return this.staffRepository;
     }
-
-    async close(): Promise<void> {
+    async close() {
         return new Promise((resolve, reject) => {
             if (!this.db) {
                 resolve();
                 return;
             }
-
             console.log('[DB] データベース接続を閉じています...');
-
             this.db.close((err) => {
                 if (err) {
                     console.error('[DB] データベース切断エラー:', err);
                     reject(err);
-                } else {
+                }
+                else {
                     console.log('[DB] データベース接続を閉じました');
                     this.db = null;
                     this.staffRepository = null;
@@ -306,14 +272,8 @@ export class DatabaseManager {
             });
         });
     }
-
     // デバッグ用：データベース状態の確認
-    async getStatus(): Promise<{
-        connected: boolean;
-        path: string;
-        tables: string[];
-        staffCount: number;
-    }> {
+    async getStatus() {
         return new Promise((resolve, reject) => {
             if (!this.db) {
                 resolve({
@@ -324,21 +284,18 @@ export class DatabaseManager {
                 });
                 return;
             }
-
             // テーブル一覧を取得
-            this.db.all("SELECT name FROM sqlite_master WHERE type='table'", (err, tables: any[]) => {
+            this.db.all("SELECT name FROM sqlite_master WHERE type='table'", (err, tables) => {
                 if (err) {
                     reject(err);
                     return;
                 }
-
                 // スタッフ数を取得
-                this.db!.get('SELECT COUNT(*) as count FROM staff', (err, row: any) => {
+                this.db.get('SELECT COUNT(*) as count FROM staff', (err, row) => {
                     if (err) {
                         reject(err);
                         return;
                     }
-
                     resolve({
                         connected: true,
                         path: this.dbPath,
@@ -350,3 +307,5 @@ export class DatabaseManager {
         });
     }
 }
+exports.DatabaseManager = DatabaseManager;
+//# sourceMappingURL=index.js.map

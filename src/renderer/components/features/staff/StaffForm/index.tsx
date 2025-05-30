@@ -19,9 +19,16 @@ import {
     Tooltip,
 } from '@mui/material';
 import { ColorLens, Close } from '@mui/icons-material';
-import { Staff, StaffFormData } from '../../../../shared/types';
-import { EVENT_COLORS, PERMISSION_LEVELS } from '../../../../shared/constants';
-import { useStaff } from '../../../hooks/useStaff';
+
+// ❌ 修正前: 相対パスで複雑
+// import { Staff, StaffFormData } from '../../../../shared/types';
+// import { EVENT_COLORS, PERMISSION_LEVELS } from '../../../../shared/constants';
+// import { useStaff } from '../../../hooks/useStaff';
+
+// ✅ 修正後: パスエイリアスを使用（シンプル）
+import { Staff, StaffFormData } from '@shared/types';
+import { EVENT_COLORS, PERMISSION_LEVELS } from '@shared/constants';
+import { useStaff } from '@renderer/hooks/useStaff';
 
 export interface StaffFormProps {
     open: boolean;
