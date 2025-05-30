@@ -3,11 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// src/main/index.ts (デバッグ強化版)
+// src/main/index.ts (修正版 - IPCハンドラー完全対応)
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const handlers_1 = require("./handlers");
 let mainWindow = null;
+let handlerManager = null;
 // 詳細なパス情報を表示
 function debugPaths() {
     console.log('=== 🔍 パス情報デバッグ ===');
@@ -26,35 +28,12 @@ function debugPaths() {
         const exists = fs_1.default.existsSync(candidate);
         console.log(`  ${index + 1}. ${candidate} -> ${exists ? '✅存在' : '❌不存在'}`);
     });
-    // distディレクトリの内容確認
-    const distPath = path_1.default.join(process.cwd(), 'dist');
-    console.log('\ndistディレクトリ:', distPath);
-    try {
-        if (fs_1.default.existsSync(distPath)) {
-            const distContents = fs_1.default.readdirSync(distPath);
-            console.log('distディレクトリの内容:', distContents);
-            // preloadディレクトリの確認
-            const preloadDir = path_1.default.join(distPath, 'preload');
-            if (fs_1.default.existsSync(preloadDir)) {
-                const preloadContents = fs_1.default.readdirSync(preloadDir);
-                console.log('dist/preloadディレクトリの内容:', preloadContents);
-            }
-            else {
-                console.log('❌ dist/preloadディレクトリが存在しません');
-            }
-        }
-        else {
-            console.log('❌ distディレクトリが存在しません');
-        }
-    }
-    catch (error) {
-        console.error('ディレクトリ読み取りエラー:', error);
-    }
     console.log('=== デバッグ終了 ===\n');
 }
 // 基本IPCハンドラー
-function setupIPC() {
-    console.log('🔵 [MAIN] IPC設定開始');
+function setupBasicIPC() {
+    console.log('🔵 [MAIN] 基本IPC設定開始');
+    // システムテスト
     electron_1.ipcMain.handle('system:test:connection', async () => {
         console.log('✅ [MAIN] 接続テスト呼び出し');
         return {
@@ -66,7 +45,67 @@ function setupIPC() {
             }
         };
     });
-    console.log('✅ [MAIN] IPC設定完了');
+    // アプリバージョン取得
+    electron_1.ipcMain.handle('app:getVersion', async () => {
+        console.log('✅ [MAIN] アプリバージョン要求');
+        return {
+            success: true,
+            data: {
+                version: electron_1.app.getVersion(),
+                name: electron_1.app.getName()
+            }
+        };
+    });
+    // アプリパス取得
+    electron_1.ipcMain.handle('app:getPath', async () => {
+        console.log('✅ [MAIN] アプリパス要求');
+        return {
+            success: true,
+            data: {
+                userData: electron_1.app.getPath('userData'),
+                documents: electron_1.app.getPath('documents'),
+                temp: electron_1.app.getPath('temp')
+            }
+        };
+    });
+    // 通知表示
+    electron_1.ipcMain.handle('notification:show', async (event, title, body) => {
+        console.log('✅ [MAIN] 通知表示要求:', { title, body });
+        // Electronの通知機能を使用
+        const { Notification } = require('electron');
+        if (Notification.isSupported()) {
+            const notification = new Notification({ title, body });
+            notification.show();
+            return {
+                success: true,
+                data: {
+                    shown: true,
+                    message: '通知を表示しました'
+                }
+            };
+        }
+        else {
+            return {
+                success: false,
+                error: '通知がサポートされていません'
+            };
+        }
+    });
+    console.log('✅ [MAIN] 基本IPC設定完了');
+}
+// ハンドラーマネージャー初期化
+async function setupHandlers() {
+    try {
+        console.log('🔵 [MAIN] ハンドラーマネージャー初期化開始');
+        handlerManager = new handlers_1.HandlerManager();
+        await handlerManager.initialize();
+        console.log('✅ [MAIN] ハンドラーマネージャー初期化完了');
+    }
+    catch (error) {
+        console.error('❌ [MAIN] ハンドラーマネージャー初期化失敗:', error);
+        // ハンドラーマネージャーが失敗しても基本機能は動かす
+        console.log('⚠️ [MAIN] 基本IPCのみで継続します');
+    }
 }
 function createWindow() {
     console.log('🔵 [MAIN] ウィンドウ作成開始');
@@ -92,11 +131,14 @@ function createWindow() {
         // プリロードなしでウィンドウを作成（デバッグ用）
         console.log('⚠️ [MAIN] プリロードなしでウィンドウを作成します（デバッグ用）');
     }
+    // セキュリティ設定を改善（開発環境では一部緩和）
+    const isDev = process.env.NODE_ENV === 'development';
     const webPreferences = {
         nodeIntegration: false,
         contextIsolation: true,
-        webSecurity: false,
+        webSecurity: !isDev,
         devTools: true,
+        allowRunningInsecureContent: isDev, // 開発環境のみ
     };
     // プリロードパスが有効な場合のみ設定
     if (preloadPath) {
@@ -109,7 +151,6 @@ function createWindow() {
         webPreferences,
     });
     // 開発サーバーに接続
-    const isDev = process.env.NODE_ENV === 'development';
     console.log('🔍 [MAIN] 開発モード:', isDev);
     if (isDev) {
         console.log('🔵 [MAIN] 開発サーバーに接続中...');
@@ -189,11 +230,15 @@ function checkPreloadStatus() {
         });
         
         // テスト実行
-        if (hasElectronAPI && window.electronAPI.test) {
+        if (hasElectronAPI && window.electronAPI.testConnection) {
             try {
-                const result = window.electronAPI.test();
-                console.log('✅ [RENDERER] テスト実行成功:', result);
-                return 'プリロード完全成功';
+                window.electronAPI.testConnection().then(result => {
+                    console.log('✅ [RENDERER] テスト実行成功:', result);
+                    return 'プリロード完全成功';
+                }).catch(error => {
+                    console.error('❌ [RENDERER] テスト実行失敗:', error);
+                    return 'プリロード部分的成功';
+                });
             } catch (error) {
                 console.error('❌ [RENDERER] テスト実行失敗:', error);
                 return 'プリロード部分的成功';
@@ -213,8 +258,14 @@ async function initialize() {
     console.log('🔍 [MAIN] Electronバージョン:', process.versions.electron);
     console.log('🔍 [MAIN] Nodeバージョン:', process.versions.node);
     try {
-        setupIPC();
+        // 1. 基本IPCを先に設定
+        setupBasicIPC();
+        // 2. ウィンドウ作成
         createWindow();
+        // 3. ハンドラーマネージャー初期化（非同期）
+        setTimeout(async () => {
+            await setupHandlers();
+        }, 1000);
         console.log('✅ [MAIN] アプリ初期化完了');
     }
     catch (error) {
@@ -235,6 +286,20 @@ electron_1.app.on('activate', () => {
     if (electron_1.BrowserWindow.getAllWindows().length === 0) {
         createWindow();
     }
+});
+// アプリ終了時のクリーンアップ
+electron_1.app.on('before-quit', async () => {
+    console.log('🔵 [MAIN] アプリ終了処理開始');
+    if (handlerManager) {
+        try {
+            await handlerManager.close();
+            console.log('✅ [MAIN] ハンドラーマネージャーを正常終了');
+        }
+        catch (error) {
+            console.error('❌ [MAIN] ハンドラーマネージャー終了エラー:', error);
+        }
+    }
+    console.log('✅ [MAIN] アプリ終了処理完了');
 });
 // エラーハンドリング
 process.on('uncaughtException', (error) => {

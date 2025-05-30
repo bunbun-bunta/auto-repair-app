@@ -1,4 +1,4 @@
-// 日付操作のユーティリティ
+// src/shared/utils/date.ts
 export const DateUtils = {
     // 日付をフォーマット
     format: (date: Date | string, format: string = 'YYYY-MM-DD'): string => {

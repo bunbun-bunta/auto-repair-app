@@ -1,13 +1,12 @@
-import { VALIDATION_RULES, ERROR_MESSAGES } from '../constants';
+// src/shared/utils/validation.ts
+import { ERROR_MESSAGES } from '../constants';
 
 export interface ValidationResult {
     isValid: boolean;
     errors: string[];
 }
 
-// バリデーション関数
 export const ValidationUtils = {
-    // 必須チェック
     validateRequired: (value: any): ValidationResult => {
         const isValid = value !== undefined && value !== null && value !== '';
         return {
@@ -16,18 +15,17 @@ export const ValidationUtils = {
         };
     },
 
-    // メールアドレスチェック
     validateEmail: (email: string): ValidationResult => {
-        if (!email) return { isValid: true, errors: [] }; // 任意項目
+        if (!email) return { isValid: true, errors: [] }; // Optional field
 
-        const isValid = VALIDATION_RULES.EMAIL.PATTERN.test(email);
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const isValid = emailRegex.test(email);
         return {
             isValid,
             errors: isValid ? [] : [ERROR_MESSAGES.INVALID_EMAIL],
         };
     },
 
-    // 日付範囲チェック
     validateDateRange: (startDate: string, endDate: string): ValidationResult => {
         if (!startDate || !endDate) return { isValid: true, errors: [] };
 
@@ -41,7 +39,6 @@ export const ValidationUtils = {
         };
     },
 
-    // 複数のバリデーション結果をまとめる
     combineValidationResults: (results: ValidationResult[]): ValidationResult => {
         const allErrors = results.flatMap(result => result.errors);
         return {

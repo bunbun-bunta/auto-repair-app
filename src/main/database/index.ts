@@ -1,13 +1,15 @@
-// src/main/database/index.ts (修正版 - パス問題解決)
+// src/main/database/index.ts (完全版 - ScheduleRepository対応)
 import { Database } from 'sqlite3';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { StaffRepository } from './repositories/staff-repository';
+import { ScheduleRepository } from './repositories/schedule-repository';
 
 export class DatabaseManager {
     private db: Database | null = null;
     private staffRepository: StaffRepository | null = null;
+    private scheduleRepository: ScheduleRepository | null = null;
     private dbPath: string;
 
     constructor() {
@@ -16,7 +18,7 @@ export class DatabaseManager {
             // Electronアプリの場合
             const userDataPath = app.getPath('userData');
             this.dbPath = path.join(userDataPath, 'auto_repair.sqlite');
-            
+
             // データフォルダが存在しない場合は作成
             if (!fs.existsSync(userDataPath)) {
                 fs.mkdirSync(userDataPath, { recursive: true });
@@ -24,7 +26,7 @@ export class DatabaseManager {
         } catch (error) {
             // Electronが利用できない場合（テスト環境など）
             this.dbPath = path.join(process.cwd(), 'data', 'auto_repair.sqlite');
-            
+
             // dataフォルダを作成
             const dataDir = path.dirname(this.dbPath);
             if (!fs.existsSync(dataDir)) {
@@ -47,6 +49,7 @@ export class DatabaseManager {
 
             // リポジトリ初期化
             this.staffRepository = new StaffRepository(this.db!);
+            this.scheduleRepository = new ScheduleRepository(this.db!);
 
             console.log('[DB] データベース初期化完了');
         } catch (error) {
@@ -67,7 +70,7 @@ export class DatabaseManager {
                 }
 
                 console.log('[DB] SQLiteデータベースに接続しました');
-                
+
                 // SQLite設定の最適化
                 this.configurePragmas();
                 resolve();
@@ -181,6 +184,7 @@ export class DatabaseManager {
                 `CREATE INDEX IF NOT EXISTS idx_schedules_staff_id ON schedules(staff_id)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_start_datetime ON schedules(start_datetime)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_billing_status ON schedules(billing_status)`,
+                `CREATE INDEX IF NOT EXISTS idx_schedules_customer_name ON schedules(customer_name)`,
             ];
 
             let completed = 0;
@@ -284,6 +288,13 @@ export class DatabaseManager {
         return this.staffRepository;
     }
 
+    getScheduleRepository(): ScheduleRepository {
+        if (!this.scheduleRepository) {
+            throw new Error('ScheduleRepository が初期化されていません');
+        }
+        return this.scheduleRepository;
+    }
+
     async close(): Promise<void> {
         return new Promise((resolve, reject) => {
             if (!this.db) {
@@ -301,6 +312,7 @@ export class DatabaseManager {
                     console.log('[DB] データベース接続を閉じました');
                     this.db = null;
                     this.staffRepository = null;
+                    this.scheduleRepository = null;
                     resolve();
                 }
             });
@@ -313,6 +325,7 @@ export class DatabaseManager {
         path: string;
         tables: string[];
         staffCount: number;
+        scheduleCount: number;
     }> {
         return new Promise((resolve, reject) => {
             if (!this.db) {
@@ -320,7 +333,8 @@ export class DatabaseManager {
                     connected: false,
                     path: this.dbPath,
                     tables: [],
-                    staffCount: 0
+                    staffCount: 0,
+                    scheduleCount: 0
                 });
                 return;
             }
@@ -332,18 +346,26 @@ export class DatabaseManager {
                     return;
                 }
 
-                // スタッフ数を取得
-                this.db!.get('SELECT COUNT(*) as count FROM staff', (err, row: any) => {
+                // スタッフ数と予定数を取得
+                this.db!.get('SELECT COUNT(*) as staff_count FROM staff', (err, staffRow: any) => {
                     if (err) {
                         reject(err);
                         return;
                     }
 
-                    resolve({
-                        connected: true,
-                        path: this.dbPath,
-                        tables: tables.map(t => t.name),
-                        staffCount: row.count
+                    this.db!.get('SELECT COUNT(*) as schedule_count FROM schedules', (err, scheduleRow: any) => {
+                        if (err) {
+                            reject(err);
+                            return;
+                        }
+
+                        resolve({
+                            connected: true,
+                            path: this.dbPath,
+                            tables: tables.map(t => t.name),
+                            staffCount: staffRow.staff_count,
+                            scheduleCount: scheduleRow.schedule_count
+                        });
                     });
                 });
             });

@@ -1,10 +1,9 @@
-// src/shared/utils/index.ts
+// src/shared/utils/index.ts (更新版 - DateUtilsエクスポート追加)
 export * from './validation';
 export * from './color';
 export * from './date';
-export * from './format';
 
-// 統合されたValidationUtils（validateDateRange追加）
+// src/shared/utils/validation.ts
 import { ERROR_MESSAGES } from '../constants';
 
 export interface ValidationResult {
@@ -54,7 +53,7 @@ export const ValidationUtils = {
     },
 };
 
-// ColorUtils
+// src/shared/utils/color.ts
 export const ColorUtils = {
     hexToRgb: (hex: string): { r: number; g: number; b: number } | null => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -72,45 +71,12 @@ export const ColorUtils = {
         }).join('')}`;
     },
 
-    lighten: (color: string, percent: number): string => {
-        const rgb = ColorUtils.hexToRgb(color);
-        if (!rgb) return color;
-
-        const { r, g, b } = rgb;
-        const lightR = Math.min(255, Math.floor(r + (255 - r) * percent / 100));
-        const lightG = Math.min(255, Math.floor(g + (255 - g) * percent / 100));
-        const lightB = Math.min(255, Math.floor(b + (255 - b) * percent / 100));
-
-        return ColorUtils.rgbToHex(lightR, lightG, lightB);
-    },
-
-    darken: (color: string, percent: number): string => {
-        const rgb = ColorUtils.hexToRgb(color);
-        if (!rgb) return color;
-
-        const { r, g, b } = rgb;
-        const darkR = Math.max(0, Math.floor(r * (100 - percent) / 100));
-        const darkG = Math.max(0, Math.floor(g * (100 - percent) / 100));
-        const darkB = Math.max(0, Math.floor(b * (100 - percent) / 100));
-
-        return ColorUtils.rgbToHex(darkR, darkG, darkB);
-    },
-
-    getContrastColor: (backgroundColor: string): string => {
-        const rgb = ColorUtils.hexToRgb(backgroundColor);
-        if (!rgb) return '#000000';
-
-        const { r, g, b } = rgb;
-        const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-        return brightness > 128 ? '#000000' : '#FFFFFF';
-    },
-
     isValidHexColor: (color: string): boolean => {
         return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
     },
 };
 
-// DateUtils
+// src/shared/utils/date.ts
 export const DateUtils = {
     // 日付をフォーマット
     format: (date: Date | string, format: string = 'YYYY-MM-DD'): string => {
