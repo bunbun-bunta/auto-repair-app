@@ -93,6 +93,65 @@ const electronAPI = {
             return await electron_1.ipcRenderer.invoke('staff:checkDependencies', id);
         }
     },
+    // === 予定管理API ===
+    schedule: {
+        getAll: async () => {
+            console.log('[PRELOAD] 予定一覧取得');
+            return await electron_1.ipcRenderer.invoke('schedule:getAll');
+        },
+        getById: async (id) => {
+            console.log('[PRELOAD] 予定取得:', id);
+            return await electron_1.ipcRenderer.invoke('schedule:getById', id);
+        },
+        create: async (data) => {
+            console.log('[PRELOAD] 予定作成:', data);
+            return await electron_1.ipcRenderer.invoke('schedule:create', data);
+        },
+        update: async (id, data) => {
+            console.log('[PRELOAD] 予定更新:', id, data);
+            return await electron_1.ipcRenderer.invoke('schedule:update', id, data);
+        },
+        delete: async (id) => {
+            console.log('[PRELOAD] 予定削除:', id);
+            return await electron_1.ipcRenderer.invoke('schedule:delete', id);
+        },
+        search: async (params) => {
+            console.log('[PRELOAD] 予定検索:', params);
+            return await electron_1.ipcRenderer.invoke('schedule:search', params);
+        },
+        getByDateRange: async (startDate, endDate) => {
+            console.log('[PRELOAD] 期間指定予定取得:', startDate, endDate);
+            return await electron_1.ipcRenderer.invoke('schedule:getByDateRange', startDate, endDate);
+        },
+        getToday: async () => {
+            console.log('[PRELOAD] 今日の予定取得');
+            return await electron_1.ipcRenderer.invoke('schedule:getToday');
+        },
+        getMonthlyStatistics: async (year, month) => {
+            console.log('[PRELOAD] 月間統計取得:', year, month);
+            return await electron_1.ipcRenderer.invoke('schedule:getMonthlyStatistics', year, month);
+        },
+        complete: async (id, actualEndDatetime) => {
+            console.log('[PRELOAD] 予定完了:', id, actualEndDatetime);
+            return await electron_1.ipcRenderer.invoke('schedule:complete', id, actualEndDatetime);
+        },
+        updateBillingStatus: async (id, status) => {
+            console.log('[PRELOAD] 請求状況更新:', id, status);
+            return await electron_1.ipcRenderer.invoke('schedule:updateBillingStatus', id, status);
+        },
+        checkTimeConflict: async (staffId, startDatetime, endDatetime, excludeScheduleId) => {
+            console.log('[PRELOAD] 時間重複チェック:', staffId, startDatetime, endDatetime);
+            return await electron_1.ipcRenderer.invoke('schedule:checkTimeConflict', staffId, startDatetime, endDatetime, excludeScheduleId);
+        },
+        getUnsynced: async () => {
+            console.log('[PRELOAD] 未同期予定取得');
+            return await electron_1.ipcRenderer.invoke('schedule:getUnsynced');
+        },
+        updateGoogleEventId: async (scheduleId, googleEventId) => {
+            console.log('[PRELOAD] GoogleイベントID更新:', scheduleId, googleEventId);
+            return await electron_1.ipcRenderer.invoke('schedule:updateGoogleEventId', scheduleId, googleEventId);
+        }
+    },
     // === デバッグ機能 ===
     _debug: {
         listChannels: () => {
@@ -109,7 +168,21 @@ const electronAPI = {
                 'staff:updateOAuthStatus',
                 'staff:getStatistics',
                 'staff:checkColorUsage',
-                'staff:checkDependencies'
+                'staff:checkDependencies',
+                'schedule:getAll',
+                'schedule:getById',
+                'schedule:create',
+                'schedule:update',
+                'schedule:delete',
+                'schedule:search',
+                'schedule:getByDateRange',
+                'schedule:getToday',
+                'schedule:getMonthlyStatistics',
+                'schedule:complete',
+                'schedule:updateBillingStatus',
+                'schedule:checkTimeConflict',
+                'schedule:getUnsynced',
+                'schedule:updateGoogleEventId'
             ];
             console.log('[PRELOAD] 利用可能なチャンネル:', channels);
             return channels;

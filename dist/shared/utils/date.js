@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DateUtils = void 0;
-// 日付操作のユーティリティ
+// src/shared/utils/date.ts
 exports.DateUtils = {
     // 日付をフォーマット
     format: (date, format = 'YYYY-MM-DD') => {

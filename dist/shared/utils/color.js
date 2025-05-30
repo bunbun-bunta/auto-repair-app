@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ColorUtils = void 0;
-// src/shared/utils/color.ts （独立ファイル作成）
+// src/shared/utils/color.ts
 exports.ColorUtils = {
     hexToRgb: (hex) => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);

@@ -4,16 +4,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DatabaseManager = void 0;
-// src/main/database/index.ts (修正版 - パス問題解決)
+// src/main/database/index.ts (完全版 - ScheduleRepository対応)
 const sqlite3_1 = require("sqlite3");
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const staff_repository_1 = require("./repositories/staff-repository");
+const schedule_repository_1 = require("./repositories/schedule-repository");
 class DatabaseManager {
     constructor() {
         this.db = null;
         this.staffRepository = null;
+        this.scheduleRepository = null;
         // データベースファイルのパスを動的に決定
         try {
             // Electronアプリの場合
@@ -44,6 +46,7 @@ class DatabaseManager {
             await this.createTables();
             // リポジトリ初期化
             this.staffRepository = new staff_repository_1.StaffRepository(this.db);
+            this.scheduleRepository = new schedule_repository_1.ScheduleRepository(this.db);
             console.log('[DB] データベース初期化完了');
         }
         catch (error) {
@@ -163,6 +166,7 @@ class DatabaseManager {
                 `CREATE INDEX IF NOT EXISTS idx_schedules_staff_id ON schedules(staff_id)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_start_datetime ON schedules(start_datetime)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_billing_status ON schedules(billing_status)`,
+                `CREATE INDEX IF NOT EXISTS idx_schedules_customer_name ON schedules(customer_name)`,
             ];
             let completed = 0;
             const total = queries.length;
@@ -251,6 +255,12 @@ class DatabaseManager {
         }
         return this.staffRepository;
     }
+    getScheduleRepository() {
+        if (!this.scheduleRepository) {
+            throw new Error('ScheduleRepository が初期化されていません');
+        }
+        return this.scheduleRepository;
+    }
     async close() {
         return new Promise((resolve, reject) => {
             if (!this.db) {
@@ -267,6 +277,7 @@ class DatabaseManager {
                     console.log('[DB] データベース接続を閉じました');
                     this.db = null;
                     this.staffRepository = null;
+                    this.scheduleRepository = null;
                     resolve();
                 }
             });
@@ -280,7 +291,8 @@ class DatabaseManager {
                     connected: false,
                     path: this.dbPath,
                     tables: [],
-                    staffCount: 0
+                    staffCount: 0,
+                    scheduleCount: 0
                 });
                 return;
             }
@@ -290,17 +302,24 @@ class DatabaseManager {
                     reject(err);
                     return;
                 }
-                // スタッフ数を取得
-                this.db.get('SELECT COUNT(*) as count FROM staff', (err, row) => {
+                // スタッフ数と予定数を取得
+                this.db.get('SELECT COUNT(*) as staff_count FROM staff', (err, staffRow) => {
                     if (err) {
                         reject(err);
                         return;
                     }
-                    resolve({
-                        connected: true,
-                        path: this.dbPath,
-                        tables: tables.map(t => t.name),
-                        staffCount: row.count
+                    this.db.get('SELECT COUNT(*) as schedule_count FROM schedules', (err, scheduleRow) => {
+                        if (err) {
+                            reject(err);
+                            return;
+                        }
+                        resolve({
+                            connected: true,
+                            path: this.dbPath,
+                            tables: tables.map(t => t.name),
+                            staffCount: staffRow.staff_count,
+                            scheduleCount: scheduleRow.schedule_count
+                        });
                     });
                 });
             });

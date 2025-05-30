@@ -1,116 +1,88 @@
-// src/shared/utils/index.ts (更新版 - DateUtilsエクスポート追加)
-export * from './validation';
-export * from './color';
-export * from './date';
+// src/renderer/utils/apiHelpers.ts
+import { ApiResponse } from '@shared/types';
 
-// src/shared/utils/validation.ts
-import { ERROR_MESSAGES } from '../constants';
-
-export interface ValidationResult {
-    isValid: boolean;
-    errors: string[];
+/**
+ * APIレスポンスが成功かどうかを型安全に判定
+ */
+export function isSuccessResponse<T>(
+    response: ApiResponse<T>
+): response is ApiResponse<T> & { success: true; data: T } {
+    return response.success === true && response.data !== undefined;
 }
 
-export const ValidationUtils = {
-    validateRequired: (value: any): ValidationResult => {
-        const isValid = value !== undefined && value !== null && value !== '';
+/**
+ * APIレスポンスからエラーメッセージを取得
+ */
+export function getErrorMessage(response: ApiResponse<any>): string {
+    if (response.error) {
+        return response.error;
+    }
+    if (response.message) {
+        return response.message;
+    }
+    return '不明なエラーが発生しました';
+}
+
+/**
+ * システム情報が有効かどうかを判定
+ */
+export function isValidSystemInfo(systemInfo: any): boolean {
+    return (
+        systemInfo &&
+        typeof systemInfo === 'object' &&
+        systemInfo.version !== undefined &&
+        systemInfo.paths !== undefined
+    );
+}
+
+/**
+ * APIレスポンスのデータを安全に取得
+ */
+export function getResponseData<T>(response: ApiResponse<T>): T | null {
+    if (isSuccessResponse(response)) {
+        return response.data;
+    }
+    return null;
+}
+
+/**
+ * APIエラーをコンソールにログ出力
+ */
+export function logApiError(
+    operation: string,
+    response: ApiResponse<any>
+): void {
+    if (!response.success) {
+        console.error(`[API Error] ${operation}:`, {
+            error: response.error,
+            message: response.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+}
+
+/**
+ * 非同期API呼び出しのラッパー
+ */
+export async function safeApiCall<T>(
+    apiCall: () => Promise<ApiResponse<T>>,
+    operation: string = 'API call'
+): Promise<ApiResponse<T>> {
+    try {
+        const response = await apiCall();
+
+        if (!response.success) {
+            logApiError(operation, response);
+        }
+
+        return response;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[API Error] ${operation} failed:`, error);
+
         return {
-            isValid,
-            errors: isValid ? [] : [ERROR_MESSAGES.REQUIRED],
+            success: false,
+            error: errorMessage
         };
-    },
-
-    validateEmail: (email: string): ValidationResult => {
-        if (!email) return { isValid: true, errors: [] }; // Optional field
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const isValid = emailRegex.test(email);
-        return {
-            isValid,
-            errors: isValid ? [] : [ERROR_MESSAGES.INVALID_EMAIL],
-        };
-    },
-
-    validateDateRange: (startDate: string, endDate: string): ValidationResult => {
-        if (!startDate || !endDate) return { isValid: true, errors: [] };
-
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const isValid = start <= end;
-
-        return {
-            isValid,
-            errors: isValid ? [] : [ERROR_MESSAGES.DATE_RANGE_ERROR],
-        };
-    },
-
-    combineValidationResults: (results: ValidationResult[]): ValidationResult => {
-        const allErrors = results.flatMap(result => result.errors);
-        return {
-            isValid: allErrors.length === 0,
-            errors: allErrors,
-        };
-    },
-};
-
-// src/shared/utils/color.ts
-export const ColorUtils = {
-    hexToRgb: (hex: string): { r: number; g: number; b: number } | null => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16),
-        } : null;
-    },
-
-    rgbToHex: (r: number, g: number, b: number): string => {
-        return `#${[r, g, b].map(x => {
-            const hex = x.toString(16);
-            return hex.length === 1 ? '0' + hex : hex;
-        }).join('')}`;
-    },
-
-    isValidHexColor: (color: string): boolean => {
-        return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
-    },
-};
-
-// src/shared/utils/date.ts
-export const DateUtils = {
-    // 日付をフォーマット
-    format: (date: Date | string, format: string = 'YYYY-MM-DD'): string => {
-        const d = typeof date === 'string' ? new Date(date) : date;
-
-        const map: Record<string, string> = {
-            'YYYY': d.getFullYear().toString(),
-            'MM': (d.getMonth() + 1).toString().padStart(2, '0'),
-            'DD': d.getDate().toString().padStart(2, '0'),
-            'HH': d.getHours().toString().padStart(2, '0'),
-            'mm': d.getMinutes().toString().padStart(2, '0'),
-        };
-
-        return Object.entries(map).reduce((result, [key, value]) =>
-            result.replace(key, value), format);
-    },
-
-    // 日付が有効かチェック
-    isValid: (date: Date | string): boolean => {
-        const d = typeof date === 'string' ? new Date(date) : date;
-        return d instanceof Date && !isNaN(d.getTime());
-    },
-
-    // 日数を追加
-    addDays: (date: Date, days: number): Date => {
-        const result = new Date(date);
-        result.setDate(result.getDate() + days);
-        return result;
-    },
-
-    // 同じ日かチェック
-    isSameDay: (date1: Date, date2: Date): boolean => {
-        return date1.getFullYear() === date2.getFullYear() &&
-            date1.getMonth() === date2.getMonth() &&
-            date1.getDate() === date2.getDate();
-    },
-};
+    }
+}

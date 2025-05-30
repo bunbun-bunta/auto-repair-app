@@ -1,7 +1,8 @@
 // src/renderer/App.tsx (修正版 - 型エラー解消)
 import React, { useState, useEffect } from 'react';
 import { StaffManager } from './components/StaffManager';
-import { isSuccessResponse, getErrorMessage, isValidSystemInfo } from './utils/apiHelpers';
+import { isSuccessResponse, getErrorMessage, isValidSystemInfo, getResponseData } from './utils/apiHelpers';
+import { ApiResponse } from '@shared/types';
 
 // ナビゲーションタブの定義
 type NavigationTab = 'dashboard' | 'staff' | 'schedule' | 'calendar' | 'settings';
@@ -52,9 +53,22 @@ const navigationItems: NavigationItem[] = [
   }
 ];
 
+// システム情報の型定義
+interface SystemInfo {
+  version: ApiResponse<{
+    version: string;
+    name: string;
+  }>;
+  paths: ApiResponse<{
+    userData: string;
+    documents: string;
+    temp: string;
+  }>;
+}
+
 // ダッシュボードコンポーネント
 const Dashboard: React.FC = () => {
-  const [systemInfo, setSystemInfo] = useState<any>(null);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [electronAPIStatus, setElectronAPIStatus] = useState<string>('確認中...');
 
   useEffect(() => {
@@ -88,7 +102,10 @@ const Dashboard: React.FC = () => {
           window.electronAPI.getAppPath()
         ]);
 
-        const systemData: any = {};
+        const systemData: SystemInfo = {
+          version: { success: false, error: 'バージョン情報取得失敗' },
+          paths: { success: false, error: 'パス情報取得失敗' }
+        };
 
         // バージョン情報の処理
         if (versionResult.status === 'fulfilled') {
@@ -96,7 +113,6 @@ const Dashboard: React.FC = () => {
           systemData.version = versionResult.value;
         } else {
           console.error('❌ バージョン情報取得失敗:', versionResult.reason);
-          systemData.version = { success: false, error: 'バージョン情報取得失敗' };
         }
 
         // パス情報の処理
@@ -105,7 +121,6 @@ const Dashboard: React.FC = () => {
           systemData.paths = pathResult.value;
         } else {
           console.error('❌ パス情報取得失敗:', pathResult.reason);
-          systemData.paths = { success: false, error: 'パス情報取得失敗' };
         }
 
         setSystemInfo(systemData);
@@ -160,7 +175,7 @@ const Dashboard: React.FC = () => {
       console.log('✅ 接続テスト結果:', result);
 
       if (isSuccessResponse(result)) {
-        // 型安全：result.dataが確実に存在
+        // 型安全：result.dataが確実に存在することが保証される
         alert(`接続テスト成功！\n${result.data.message}`);
       } else {
         // エラーケース
@@ -205,30 +220,22 @@ const Dashboard: React.FC = () => {
       );
     }
 
+    // 型安全なデータ取得
+    const versionData = getResponseData(systemInfo.version);
+    const pathsData = getResponseData(systemInfo.paths);
+
     return (
       <div style={{ fontSize: '14px', color: '#666' }}>
         <p style={{ margin: '5px 0' }}>
-          <strong>アプリ:</strong> {
-            isSuccessResponse(systemInfo.version)
-              ? systemInfo.version.data.name
-              : 'N/A'
-          }
+          <strong>アプリ:</strong> {versionData?.name || 'N/A'}
         </p>
         <p style={{ margin: '5px 0' }}>
-          <strong>バージョン:</strong> {
-            isSuccessResponse(systemInfo.version)
-              ? systemInfo.version.data.version
-              : 'N/A'
-          }
+          <strong>バージョン:</strong> {versionData?.version || 'N/A'}
         </p>
         <p style={{ margin: '5px 0' }}>
           <strong>データフォルダ:</strong><br />
           <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>
-            {
-              isSuccessResponse(systemInfo.paths)
-                ? systemInfo.paths.data.userData
-                : 'N/A'
-            }
+            {pathsData?.userData || 'N/A'}
           </code>
         </p>
       </div>
