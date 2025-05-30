@@ -1,15 +1,17 @@
-// src/main/database/index.ts (完全版 - ScheduleRepository対応)
+// src/main/database/index.ts (更新版 - MasterRepository対応)
 import { Database } from 'sqlite3';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { StaffRepository } from './repositories/staff-repository';
 import { ScheduleRepository } from './repositories/schedule-repository';
+import { MasterRepository } from './repositories/master-repository';
 
 export class DatabaseManager {
     private db: Database | null = null;
     private staffRepository: StaffRepository | null = null;
     private scheduleRepository: ScheduleRepository | null = null;
+    private masterRepository: MasterRepository | null = null;
     private dbPath: string;
 
     constructor() {
@@ -50,6 +52,7 @@ export class DatabaseManager {
             // リポジトリ初期化
             this.staffRepository = new StaffRepository(this.db!);
             this.scheduleRepository = new ScheduleRepository(this.db!);
+            this.masterRepository = new MasterRepository(this.db!);
 
             console.log('[DB] データベース初期化完了');
         } catch (error) {
@@ -185,6 +188,9 @@ export class DatabaseManager {
                 `CREATE INDEX IF NOT EXISTS idx_schedules_start_datetime ON schedules(start_datetime)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_billing_status ON schedules(billing_status)`,
                 `CREATE INDEX IF NOT EXISTS idx_schedules_customer_name ON schedules(customer_name)`,
+                `CREATE INDEX IF NOT EXISTS idx_vehicle_types_usage_count ON vehicle_types(usage_count DESC)`,
+                `CREATE INDEX IF NOT EXISTS idx_customers_usage_count ON customers(usage_count DESC)`,
+                `CREATE INDEX IF NOT EXISTS idx_business_categories_usage_count ON business_categories(usage_count DESC)`,
             ];
 
             let completed = 0;
@@ -257,6 +263,12 @@ export class DatabaseManager {
                      ('スズキワゴンR', 4),
                      ('ダイハツタント', 5),
                      ('マツダデミオ', 6)`,
+
+                    // サンプル顧客データ
+                    `INSERT INTO customers (name, contact_info, display_order) VALUES
+                     ('田中太郎', '090-1234-5678', 1),
+                     ('佐藤花子', '080-9876-5432', 2),
+                     ('山田次郎', '070-1111-2222', 3)`
                 ];
 
                 let insertCompleted = 0;
@@ -295,6 +307,13 @@ export class DatabaseManager {
         return this.scheduleRepository;
     }
 
+    getMasterRepository(): MasterRepository {
+        if (!this.masterRepository) {
+            throw new Error('MasterRepository が初期化されていません');
+        }
+        return this.masterRepository;
+    }
+
     async close(): Promise<void> {
         return new Promise((resolve, reject) => {
             if (!this.db) {
@@ -313,6 +332,7 @@ export class DatabaseManager {
                     this.db = null;
                     this.staffRepository = null;
                     this.scheduleRepository = null;
+                    this.masterRepository = null;
                     resolve();
                 }
             });
@@ -326,6 +346,9 @@ export class DatabaseManager {
         tables: string[];
         staffCount: number;
         scheduleCount: number;
+        vehicleTypeCount: number;
+        customerCount: number;
+        businessCategoryCount: number;
     }> {
         return new Promise((resolve, reject) => {
             if (!this.db) {
@@ -334,7 +357,10 @@ export class DatabaseManager {
                     path: this.dbPath,
                     tables: [],
                     staffCount: 0,
-                    scheduleCount: 0
+                    scheduleCount: 0,
+                    vehicleTypeCount: 0,
+                    customerCount: 0,
+                    businessCategoryCount: 0
                 });
                 return;
             }
@@ -346,28 +372,34 @@ export class DatabaseManager {
                     return;
                 }
 
-                // スタッフ数と予定数を取得
-                this.db!.get('SELECT COUNT(*) as staff_count FROM staff', (err, staffRow: any) => {
-                    if (err) {
-                        reject(err);
-                        return;
-                    }
+                // 各テーブルのレコード数を取得
+                const countQueries = [
+                    'SELECT COUNT(*) as staff_count FROM staff',
+                    'SELECT COUNT(*) as schedule_count FROM schedules',
+                    'SELECT COUNT(*) as vehicle_type_count FROM vehicle_types WHERE is_active = 1',
+                    'SELECT COUNT(*) as customer_count FROM customers WHERE is_active = 1',
+                    'SELECT COUNT(*) as business_category_count FROM business_categories WHERE is_active = 1'
+                ];
 
-                    this.db!.get('SELECT COUNT(*) as schedule_count FROM schedules', (err, scheduleRow: any) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-
-                        resolve({
-                            connected: true,
-                            path: this.dbPath,
-                            tables: tables.map(t => t.name),
-                            staffCount: staffRow.staff_count,
-                            scheduleCount: scheduleRow.schedule_count
+                Promise.all(countQueries.map(query =>
+                    new Promise<number>((resolve, reject) => {
+                        this.db!.get(query, (err, row: any) => {
+                            if (err) reject(err);
+                            else resolve(Object.values(row)[0] as number);
                         });
+                    })
+                )).then(([staffCount, scheduleCount, vehicleTypeCount, customerCount, businessCategoryCount]) => {
+                    resolve({
+                        connected: true,
+                        path: this.dbPath,
+                        tables: tables.map(t => t.name),
+                        staffCount,
+                        scheduleCount,
+                        vehicleTypeCount,
+                        customerCount,
+                        businessCategoryCount
                     });
-                });
+                }).catch(reject);
             });
         });
     }

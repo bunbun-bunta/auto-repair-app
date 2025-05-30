@@ -67,6 +67,37 @@ interface ElectronAPI {
         updateGoogleEventId: (scheduleId: number, googleEventId: string) => Promise<ApiResponse<void>>;
     };
 
+    // マスタデータ管理API
+    master: {
+        // 車種マスタ
+        getVehicleTypes: () => Promise<ApiResponse<any[]>>;
+        createVehicleType: (name: string) => Promise<ApiResponse<any>>;
+        deleteVehicleType: (id: number) => Promise<ApiResponse<void>>;
+        incrementVehicleTypeUsage: (name: string) => Promise<ApiResponse<void>>;
+
+        // 顧客マスタ
+        getCustomers: () => Promise<ApiResponse<any[]>>;
+        createCustomer: (name: string, contactInfo?: string) => Promise<ApiResponse<any>>;
+        updateCustomer: (id: number, data: any) => Promise<ApiResponse<any>>;
+        deleteCustomer: (id: number) => Promise<ApiResponse<void>>;
+        incrementCustomerUsage: (name: string) => Promise<ApiResponse<void>>;
+
+        // 業務カテゴリマスタ
+        getBusinessCategories: () => Promise<ApiResponse<any[]>>;
+        createBusinessCategory: (name: string, icon?: string, estimatedDuration?: number) => Promise<ApiResponse<any>>;
+        updateBusinessCategory: (id: number, data: any) => Promise<ApiResponse<any>>;
+        deleteBusinessCategory: (id: number) => Promise<ApiResponse<void>>;
+        incrementBusinessCategoryUsage: (name: string) => Promise<ApiResponse<void>>;
+
+        // 統合機能
+        getAllMasterData: () => Promise<ApiResponse<{
+            vehicleTypes: any[];
+            customers: any[];
+            businessCategories: any[];
+        }>>;
+        updateUsageFromSchedule: (vehicleType?: string, customerName?: string, businessCategory?: string) => Promise<ApiResponse<void>>;
+    };
+
     // デバッグ機能
     _debug: {
         listChannels: () => string[];
@@ -99,4 +130,3 @@ declare module '*.ts' {
     const content: any;
     export default content;
 }
-

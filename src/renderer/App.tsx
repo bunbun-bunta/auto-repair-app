@@ -5,7 +5,7 @@ import { isSuccessResponse, getErrorMessage, isValidSystemInfo, getResponseData 
 import { ApiResponse } from '@shared/types';
 
 // ナビゲーションタブの定義
-type NavigationTab = 'dashboard' | 'staff' | 'schedule' | 'calendar' | 'settings';
+type NavigationTab = 'dashboard' | 'staff' | 'schedule' | 'master' | 'calendar' | 'settings';
 
 interface NavigationItem {
   id: NavigationTab;
@@ -35,7 +35,14 @@ const navigationItems: NavigationItem[] = [
     label: '予定管理',
     icon: '📅',
     description: '予定の登録・編集',
-    available: false // 未実装
+    available: true
+  },
+  {
+    id: 'master',
+    label: 'マスタ管理',
+    icon: '🗂️',
+    description: '車種・顧客・業務カテゴリ',
+    available: true
   },
   {
     id: 'calendar',
