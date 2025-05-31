@@ -1,370 +1,695 @@
-// src/main/handlers/master-handler.ts
-import { ipcMain, IpcMainInvokeEvent } from 'electron';
-import { MasterService } from '../services/master-service';
-import { VehicleType, Customer, BusinessCategory, ApiResponse } from '../../shared/types';
+// src/renderer/components/MasterManager.tsx - 完全版マスタデータ管理画面
+import React, { useState, useCallback } from 'react';
+import { useMaster } from '../hooks/useMaster';
+import { VehicleType, Customer, BusinessCategory } from '@shared/types';
 
-export class MasterHandler {
-    private masterService: MasterService;
+// マスタタイプの定義
+type MasterType = 'vehicleTypes' | 'customers' | 'businessCategories';
 
-    constructor(masterService: MasterService) {
-        this.masterService = masterService;
-        this.registerHandlers();
-    }
+// マスタデータカードのプロパティ
+interface MasterDataCardProps {
+    item: VehicleType | Customer | BusinessCategory;
+    type: MasterType;
+    onEdit: (item: any) => void;
+    onDelete: (item: any) => void;
+}
 
-    private registerHandlers(): void {
-        console.log('[MasterHandler] IPCハンドラー登録開始...');
+// マスタデータカードコンポーネント
+const MasterDataCard: React.FC<MasterDataCardProps> = ({ item, type, onEdit, onDelete }) => {
+    const formatLastUsed = (lastUsedAt?: string) => {
+        if (!lastUsedAt) return '未使用';
+        const date = new Date(lastUsedAt);
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+    };
 
-        // ===== 車種マスタ =====
-        ipcMain.handle('master:getVehicleTypes', this.handleGetVehicleTypes.bind(this));
-        ipcMain.handle('master:createVehicleType', this.handleCreateVehicleType.bind(this));
-        ipcMain.handle('master:deleteVehicleType', this.handleDeleteVehicleType.bind(this));
-        ipcMain.handle('master:incrementVehicleTypeUsage', this.handleIncrementVehicleTypeUsage.bind(this));
-
-        // ===== 顧客マスタ =====
-        ipcMain.handle('master:getCustomers', this.handleGetCustomers.bind(this));
-        ipcMain.handle('master:createCustomer', this.handleCreateCustomer.bind(this));
-        ipcMain.handle('master:updateCustomer', this.handleUpdateCustomer.bind(this));
-        ipcMain.handle('master:deleteCustomer', this.handleDeleteCustomer.bind(this));
-        ipcMain.handle('master:incrementCustomerUsage', this.handleIncrementCustomerUsage.bind(this));
-
-        // ===== 業務カテゴリマスタ =====
-        ipcMain.handle('master:getBusinessCategories', this.handleGetBusinessCategories.bind(this));
-        ipcMain.handle('master:createBusinessCategory', this.handleCreateBusinessCategory.bind(this));
-        ipcMain.handle('master:updateBusinessCategory', this.handleUpdateBusinessCategory.bind(this));
-        ipcMain.handle('master:deleteBusinessCategory', this.handleDeleteBusinessCategory.bind(this));
-        ipcMain.handle('master:incrementBusinessCategoryUsage', this.handleIncrementBusinessCategoryUsage.bind(this));
-
-        // ===== 統合機能 =====
-        ipcMain.handle('master:getAllMasterData', this.handleGetAllMasterData.bind(this));
-        ipcMain.handle('master:updateUsageFromSchedule', this.handleUpdateUsageFromSchedule.bind(this));
-
-        console.log('[MasterHandler] IPCハンドラー登録完了');
-    }
-
-    // ===== 車種マスタハンドラー =====
-
-    private async handleGetVehicleTypes(event: IpcMainInvokeEvent): Promise<ApiResponse<VehicleType[]>> {
-        try {
-            console.log('[MasterHandler] 車種一覧取得要求');
-            return await this.masterService.getVehicleTypes();
-        } catch (error) {
-            console.error('[MasterHandler] 車種一覧取得エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '業務カテゴリの削除でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleIncrementBusinessCategoryUsage(
-        event: IpcMainInvokeEvent,
-        name: string
-    ): Promise<ApiResponse<void>> {
-        try {
-            return await this.masterService.incrementBusinessCategoryUsage(name);
-        } catch (error) {
-            console.error('[MasterHandler] 業務カテゴリ使用回数更新エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '業務カテゴリ使用回数の更新でエラーが発生しました'
-            };
-        }
-    }
-
-    // ===== 統合機能ハンドラー =====
-
-    private async handleGetAllMasterData(event: IpcMainInvokeEvent): Promise<ApiResponse<{
-        vehicleTypes: VehicleType[];
-        customers: Customer[];
-        businessCategories: BusinessCategory[];
-    }>> {
-        try {
-            console.log('[MasterHandler] 全マスタデータ取得要求');
-            return await this.masterService.getAllMasterData();
-        } catch (error) {
-            console.error('[MasterHandler] 全マスタデータ取得エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '全マスタデータの取得でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleUpdateUsageFromSchedule(
-        event: IpcMainInvokeEvent,
-        vehicleType?: string,
-        customerName?: string,
-        businessCategory?: string
-    ): Promise<ApiResponse<void>> {
-        try {
-            console.log('[MasterHandler] 予定作成時の使用回数更新:', { vehicleType, customerName, businessCategory });
+    const getTypeSpecificInfo = () => {
+        switch (type) {
+            case 'customers':
+                const customer = item as Customer;
+                return customer.contactInfo ? (
+                    <p style={{ margin: '4px 0', color: '#666', fontSize: '14px' }}>
+                        📞 {customer.contactInfo}
+                    </p>
+                ) : null;
             
-            await this.masterService.updateUsageCountsFromSchedule(vehicleType, customerName, businessCategory);
+            case 'businessCategories':
+                const category = item as BusinessCategory;
+                return (
+                    <>
+                        {category.estimatedDuration && (
+                            <p style={{ margin: '4px 0', color: '#666', fontSize: '14px' }}>
+                                ⏱️ 推定時間: {category.estimatedDuration}分
+                            </p>
+                        )}
+                    </>
+                );
             
-            return { success: true };
-        } catch (error) {
-            console.error('[MasterHandler] 使用回数更新エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '使用回数の更新でエラーが発生しました'
-            };
+            default:
+                return null;
         }
-    }
-} '車種一覧の取得でエラーが発生しました'
-            };
-        }
-    }
+    };
 
-    private async handleCreateVehicleType(
-        event: IpcMainInvokeEvent,
-        name: string
-    ): Promise<ApiResponse<VehicleType>> {
+    return (
+        <div style={{
+            backgroundColor: 'white',
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            padding: '16px',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: '16px' }}>
+                        {type === 'businessCategories' && (item as BusinessCategory).icon && (
+                            <span style={{ marginRight: '8px' }}>{(item as BusinessCategory).icon}</span>
+                        )}
+                        {item.name}
+                    </h4>
+                    {getTypeSpecificInfo()}
+                </div>
+            </div>
+
+            {/* 使用統計 */}
+            <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '8px',
+                borderRadius: '4px',
+                marginBottom: '12px'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}>
+                    <span>使用回数: <strong>{item.usageCount || 0}回</strong></span>
+                    <span>最終使用: {formatLastUsed(item.lastUsedAt)}</span>
+                </div>
+            </div>
+
+            {/* アクションボタン */}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                {(type === 'customers' || type === 'businessCategories') && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(item);
+                        }}
+                        style={{
+                            background: '#2196f3',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                        }}
+                    >
+                        ✏️ 編集
+                    </button>
+                )}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(item);
+                    }}
+                    style={{
+                        background: '#f44336',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                    }}
+                >
+                    🗑️ 削除
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// マスタデータフォームのプロパティ
+interface MasterDataFormProps {
+    type: MasterType;
+    item?: any | null;
+    onSave: (data: any) => Promise<boolean>;
+    onCancel: () => void;
+}
+
+// マスタデータフォームコンポーネント
+const MasterDataForm: React.FC<MasterDataFormProps> = ({ type, item, onSave, onCancel }) => {
+    const [formData, setFormData] = useState(() => ({
+        name: item?.name || '',
+        contactInfo: item?.contactInfo || '',
+        icon: item?.icon || '',
+        estimatedDuration: item?.estimatedDuration || '',
+    }));
+    const [saving, setSaving] = useState(false);
+
+    const getTitle = () => {
+        const typeNames = {
+            vehicleTypes: '車種',
+            customers: '顧客',
+            businessCategories: '業務カテゴリ'
+        };
+        return `${item ? '編集' : '新規登録'} - ${typeNames[type]}`;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.name.trim()) {
+            alert('名前は必須です');
+            return;
+        }
+
+        setSaving(true);
         try {
-            console.log('[MasterHandler] 車種作成要求:', name);
-            const result = await this.masterService.createVehicleType(name);
+            const success = await onSave(formData);
+            if (success) {
+                onCancel();
+            }
+        } catch (error) {
+            console.error('保存エラー:', error);
+        } finally {
+            setSaving(false);
+        }
+    };
 
-            if (result.success) {
-                console.log(`[MasterHandler] 車種作成成功: ${name}`);
-            } else {
-                console.error('[MasterHandler] 車種作成失敗:', result.error);
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+        }}>
+            <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '12px',
+                width: '400px',
+                maxWidth: '90vw'
+            }}>
+                <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>
+                    {getTitle()}
+                </h2>
+
+                <form onSubmit={handleSubmit}>
+                    {/* 名前 */}
+                    <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                            名前 *
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                            style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: '1px solid #ddd',
+                                borderRadius: '6px',
+                                fontSize: '16px'
+                            }}
+                            required
+                        />
+                    </div>
+
+                    {/* 顧客の場合：連絡先 */}
+                    {type === 'customers' && (
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                連絡先
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.contactInfo}
+                                onChange={(e) => setFormData(prev => ({ ...prev, contactInfo: e.target.value }))}
+                                placeholder="電話番号やメールアドレス"
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '6px',
+                                    fontSize: '16px'
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* 業務カテゴリの場合：アイコンと推定時間 */}
+                    {type === 'businessCategories' && (
+                        <>
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                    アイコン
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.icon}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
+                                    placeholder="🔧 (絵文字など)"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '6px',
+                                        fontSize: '16px'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                    推定作業時間（分）
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formData.estimatedDuration}
+                                    onChange={(e) => setFormData(prev => ({ 
+                                        ...prev, 
+                                        estimatedDuration: parseInt(e.target.value) || '' 
+                                    }))}
+                                    placeholder="60"
+                                    min="0"
+                                    max="480"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '6px',
+                                        fontSize: '16px'
+                                    }}
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            style={{
+                                padding: '10px 20px',
+                                border: '1px solid #ddd',
+                                backgroundColor: 'white',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                            }}
+                            disabled={saving}
+                        >
+                            キャンセル
+                        </button>
+                        <button
+                            type="submit"
+                            style={{
+                                padding: '10px 20px',
+                                backgroundColor: '#1976d2',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                            }}
+                            disabled={saving}
+                        >
+                            {saving ? '保存中...' : (item ? '更新' : '登録')}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// メインのマスタ管理コンポーネント
+export const MasterManager: React.FC = () => {
+    const {
+        vehicleTypes,
+        customers,
+        businessCategories,
+        loading,
+        error,
+        createVehicleType,
+        deleteVehicleType,
+        createCustomer,
+        updateCustomer,
+        deleteCustomer,
+        createBusinessCategory,
+        updateBusinessCategory,
+        deleteBusinessCategory,
+        clearError,
+        loadAllMasterData,
+    } = useMaster();
+
+    const [activeTab, setActiveTab] = useState<MasterType>('vehicleTypes');
+    const [showForm, setShowForm] = useState(false);
+    const [editingItem, setEditingItem] = useState<any>(null);
+
+    // タブ情報
+    const tabs = [
+        { key: 'vehicleTypes', label: '車種マスタ', icon: '🚗', count: vehicleTypes.length },
+        { key: 'customers', label: '顧客マスタ', icon: '👥', count: customers.length },
+        { key: 'businessCategories', label: '業務カテゴリ', icon: '📋', count: businessCategories.length },
+    ] as const;
+
+    // 新規作成
+    const handleCreate = useCallback(() => {
+        setEditingItem(null);
+        setShowForm(true);
+    }, []);
+
+    // 編集
+    const handleEdit = useCallback((item: any) => {
+        setEditingItem(item);
+        setShowForm(true);
+    }, []);
+
+    // 削除
+    const handleDelete = useCallback(async (item: any) => {
+        if (!item.id) return;
+
+        const itemName = item.name;
+        if (window.confirm(`「${itemName}」を削除してもよろしいですか？`)) {
+            let success = false;
+
+            switch (activeTab) {
+                case 'vehicleTypes':
+                    success = await deleteVehicleType(item.id);
+                    break;
+                case 'customers':
+                    success = await deleteCustomer(item.id);
+                    break;
+                case 'businessCategories':
+                    success = await createBusinessCategory(formData.name, formData.icon, formData.estimatedDuration);
+                    break;
+            }
+        }
+
+        if (success) {
+            setShowForm(false);
+            setEditingItem(null);
+        }
+
+        return success;
+    }, [activeTab, editingItem, createVehicleType, createCustomer, createBusinessCategory, updateCustomer, updateBusinessCategory]);
+
+    // 現在のデータを取得
+    const getCurrentData = () => {
+        switch (activeTab) {
+            case 'vehicleTypes':
+                return vehicleTypes;
+            case 'customers':
+                return customers;
+            case 'businessCategories':
+                return businessCategories;
+            default:
+                return [];
+        }
+    };
+
+    // フォームを閉じる
+    const handleCloseForm = useCallback(() => {
+        setShowForm(false);
+        setEditingItem(null);
+    }, []);
+
+    return (
+        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+            {/* ヘッダー */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '30px'
+            }}>
+                <h1 style={{ margin: 0, color: '#333' }}>マスタデータ管理</h1>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        onClick={loadAllMasterData}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#757575',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                        }}
+                        disabled={loading}
+                    >
+                        {loading ? '更新中...' : '🔄 更新'}
+                    </button>
+                    <button
+                        onClick={handleCreate}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#4caf50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        ➕ 新規登録
+                    </button>
+                </div>
+            </div>
+
+            {/* エラー表示 */}
+            {error && (
+                <div style={{
+                    backgroundColor: '#ffebee',
+                    border: '1px solid #f44336',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <span style={{ color: '#c62828' }}>{error}</span>
+                    <button
+                        onClick={clearError}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#c62828',
+                            cursor: 'pointer',
+                            fontSize: '16px'
+                        }}
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* 統計カード */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '20px',
+                marginBottom: '30px'
+            }}>
+                {tabs.map((tab) => (
+                    <div key={tab.key} style={{
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '12px',
+                        textAlign: 'center',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        border: activeTab === tab.key ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                    onClick={() => setActiveTab(tab.key as MasterType)}
+                    onMouseEnter={(e) => {
+                        if (activeTab !== tab.key) {
+                            e.currentTarget.style.borderColor = '#1976d2';
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (activeTab !== tab.key) {
+                            e.currentTarget.style.borderColor = '#e0e0e0';
+                        }
+                    }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>{tab.icon}</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1976d2', marginBottom: '4px' }}>
+                            {tab.count}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#666' }}>{tab.label}</div>
+                    </div>
+                ))}
+            </div>
+
+            {/* タブナビゲーション */}
+            <div style={{
+                borderBottom: '1px solid #ddd',
+                marginBottom: '20px'
+            }}>
+                <div style={{ display: 'flex', gap: '0' }}>
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key as MasterType)}
+                            style={{
+                                padding: '12px 24px',
+                                border: 'none',
+                                backgroundColor: activeTab === tab.key ? '#e3f2fd' : 'transparent',
+                                color: activeTab === tab.key ? '#1976d2' : '#666',
+                                borderBottom: activeTab === tab.key ? '2px solid #1976d2' : '2px solid transparent',
+                                cursor: 'pointer',
+                                fontSize: '16px',
+                                fontWeight: activeTab === tab.key ? 'bold' : 'normal',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <span style={{ fontSize: '20px' }}>{tab.icon}</span>
+                            {tab.label}
+                            <span style={{
+                                backgroundColor: activeTab === tab.key ? '#1976d2' : '#999',
+                                color: 'white',
+                                borderRadius: '12px',
+                                padding: '2px 8px',
+                                fontSize: '12px',
+                                minWidth: '20px',
+                                textAlign: 'center'
+                            }}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* コンテンツエリア */}
+            <div style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+                {loading && getCurrentData().length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '40px',
+                        color: '#666'
+                    }}>
+                        <div style={{ fontSize: '18px', marginBottom: '8px' }}>📊</div>
+                        <div>読み込み中...</div>
+                    </div>
+                ) : getCurrentData().length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '40px',
+                        color: '#666'
+                    }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+                            {tabs.find(tab => tab.key === activeTab)?.icon}
+                        </div>
+                        <div style={{ fontSize: '18px', marginBottom: '8px' }}>
+                            {tabs.find(tab => tab.key === activeTab)?.label}が登録されていません
+                        </div>
+                        <div style={{ marginBottom: '20px' }}>
+                            最初のデータを登録してください
+                        </div>
+                        <button
+                            onClick={handleCreate}
+                            style={{
+                                padding: '12px 24px',
+                                backgroundColor: '#4caf50',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '16px',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            ➕ 最初のデータを登録
+                        </button>
+                    </div>
+                ) : (
+                    <div>
+                        <h3 style={{ margin: '0 0 20px 0', color: '#333' }}>
+                            {tabs.find(tab => tab.key === activeTab)?.label} ({getCurrentData().length}件)
+                        </h3>
+
+                        {/* データ一覧 */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                            gap: '16px'
+                        }}>
+                            {getCurrentData().map((item: any) => (
+                                <MasterDataCard
+                                    key={item.id}
+                                    item={item}
+                                    type={activeTab}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* フォームダイアログ */}
+            {showForm && (
+                <MasterDataForm
+                    type={activeTab}
+                    item={editingItem}
+                    onSave={handleFormSubmit}
+                    onCancel={handleCloseForm}
+                />
+            )}
+        </div>
+    );
+}; await deleteBusinessCategory(item.id);
+                    break;
             }
 
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 車種作成エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '車種の作成でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleDeleteVehicleType(
-        event: IpcMainInvokeEvent,
-        id: number
-    ): Promise<ApiResponse<void>> {
-        try {
-            console.log('[MasterHandler] 車種削除要求:', id);
-            const result = await this.masterService.deleteVehicleType(id);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 車種削除成功: ID ${id}`);
-            } else {
-                console.error('[MasterHandler] 車種削除失敗:', result.error);
+            if (success) {
+                console.log(`${itemName} を削除しました`);
             }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 車種削除エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '車種の削除でエラーが発生しました'
-            };
         }
-    }
+    }, [activeTab, deleteVehicleType, deleteCustomer, deleteBusinessCategory]);
 
-    private async handleIncrementVehicleTypeUsage(
-        event: IpcMainInvokeEvent,
-        name: string
-    ): Promise<ApiResponse<void>> {
-        try {
-            return await this.masterService.incrementVehicleTypeUsage(name);
-        } catch (error) {
-            console.error('[MasterHandler] 車種使用回数更新エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '車種使用回数の更新でエラーが発生しました'
-            };
-        }
-    }
+    // フォーム送信
+    const handleFormSubmit = useCallback(async (formData: any): Promise<boolean> => {
+        let success = false;
 
-    // ===== 顧客マスタハンドラー =====
-
-    private async handleGetCustomers(event: IpcMainInvokeEvent): Promise<ApiResponse<Customer[]>> {
-        try {
-            console.log('[MasterHandler] 顧客一覧取得要求');
-            return await this.masterService.getCustomers();
-        } catch (error) {
-            console.error('[MasterHandler] 顧客一覧取得エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '顧客一覧の取得でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleCreateCustomer(
-        event: IpcMainInvokeEvent,
-        name: string,
-        contactInfo?: string
-    ): Promise<ApiResponse<Customer>> {
-        try {
-            console.log('[MasterHandler] 顧客作成要求:', name);
-            const result = await this.masterService.createCustomer(name, contactInfo);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 顧客作成成功: ${name}`);
-            } else {
-                console.error('[MasterHandler] 顧客作成失敗:', result.error);
+        if (editingItem) {
+            // 更新
+            switch (activeTab) {
+                case 'customers':
+                    success = await updateCustomer(editingItem.id, formData);
+                    break;
+                case 'businessCategories':
+                    success = await updateBusinessCategory(editingItem.id, formData);
+                    break;
             }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 顧客作成エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '顧客の作成でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleUpdateCustomer(
-        event: IpcMainInvokeEvent,
-        id: number,
-        data: Partial<Customer>
-    ): Promise<ApiResponse<Customer>> {
-        try {
-            console.log('[MasterHandler] 顧客更新要求:', id, Object.keys(data));
-            const result = await this.masterService.updateCustomer(id, data);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 顧客更新成功: ID ${id}`);
-            } else {
-                console.error('[MasterHandler] 顧客更新失敗:', result.error);
-            }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 顧客更新エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '顧客の更新でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleDeleteCustomer(
-        event: IpcMainInvokeEvent,
-        id: number
-    ): Promise<ApiResponse<void>> {
-        try {
-            console.log('[MasterHandler] 顧客削除要求:', id);
-            const result = await this.masterService.deleteCustomer(id);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 顧客削除成功: ID ${id}`);
-            } else {
-                console.error('[MasterHandler] 顧客削除失敗:', result.error);
-            }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 顧客削除エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '顧客の削除でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleIncrementCustomerUsage(
-        event: IpcMainInvokeEvent,
-        name: string
-    ): Promise<ApiResponse<void>> {
-        try {
-            return await this.masterService.incrementCustomerUsage(name);
-        } catch (error) {
-            console.error('[MasterHandler] 顧客使用回数更新エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '顧客使用回数の更新でエラーが発生しました'
-            };
-        }
-    }
-
-    // ===== 業務カテゴリマスタハンドラー =====
-
-    private async handleGetBusinessCategories(event: IpcMainInvokeEvent): Promise<ApiResponse<BusinessCategory[]>> {
-        try {
-            console.log('[MasterHandler] 業務カテゴリ一覧取得要求');
-            return await this.masterService.getBusinessCategories();
-        } catch (error) {
-            console.error('[MasterHandler] 業務カテゴリ一覧取得エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '業務カテゴリ一覧の取得でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleCreateBusinessCategory(
-        event: IpcMainInvokeEvent,
-        name: string,
-        icon?: string,
-        estimatedDuration?: number
-    ): Promise<ApiResponse<BusinessCategory>> {
-        try {
-            console.log('[MasterHandler] 業務カテゴリ作成要求:', name);
-            const result = await this.masterService.createBusinessCategory(name, icon, estimatedDuration);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 業務カテゴリ作成成功: ${name}`);
-            } else {
-                console.error('[MasterHandler] 業務カテゴリ作成失敗:', result.error);
-            }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 業務カテゴリ作成エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '業務カテゴリの作成でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleUpdateBusinessCategory(
-        event: IpcMainInvokeEvent,
-        id: number,
-        data: Partial<BusinessCategory>
-    ): Promise<ApiResponse<BusinessCategory>> {
-        try {
-            console.log('[MasterHandler] 業務カテゴリ更新要求:', id, Object.keys(data));
-            const result = await this.masterService.updateBusinessCategory(id, data);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 業務カテゴリ更新成功: ID ${id}`);
-            } else {
-                console.error('[MasterHandler] 業務カテゴリ更新失敗:', result.error);
-            }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 業務カテゴリ更新エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : '業務カテゴリの更新でエラーが発生しました'
-            };
-        }
-    }
-
-    private async handleDeleteBusinessCategory(
-        event: IpcMainInvokeEvent,
-        id: number
-    ): Promise<ApiResponse<void>> {
-        try {
-            console.log('[MasterHandler] 業務カテゴリ削除要求:', id);
-            const result = await this.masterService.deleteBusinessCategory(id);
-
-            if (result.success) {
-                console.log(`[MasterHandler] 業務カテゴリ削除成功: ID ${id}`);
-            } else {
-                console.error('[MasterHandler] 業務カテゴリ削除失敗:', result.error);
-            }
-
-            return result;
-        } catch (error) {
-            console.error('[MasterHandler] 業務カテゴリ削除エラー:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message :
+        } else {
+            // 新規作成
+            switch (activeTab) {
+                case 'vehicleTypes':
+                    success = await createVehicleType(formData.name);
+                    break;
+                case 'customers':
+                    success = await createCustomer(formData.name, formData.contactInfo);
+                    break;
+                case 'businessCategories':
+                    success =
